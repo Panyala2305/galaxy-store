@@ -1,63 +1,31 @@
-// frontend/src/pages/Cart.jsx
+// frontend/src/pages/Cart.jsx  (UPDATED)
 //
-// Shows all cart items with quantity controls.
-// Has a checkout button that places an order via the orders API,
-// then clears the cart and redirects to orders page.
+// CHANGE from previous version:
+//   Before: "Place Order" button directly called /api/orders → saved to DB immediately
+//   Now:    "Proceed to Checkout" button navigates to /checkout page
+//           Actual order is only saved AFTER Razorpay payment is verified
+//
+// Everything else stays the same.
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  fetchCart,
-  clearCartOnServer,
-  selectCartItems,
-  selectCartTotal,
-  selectCartLoading,
-} from '../features/cartSlice';
+import { Link, useNavigate }        from 'react-router-dom';
+import { fetchCart, selectCartItems, selectCartTotal, selectCartLoading } from '../features/cartSlice';
 import { selectIsLoggedIn } from '../features/authSlice';
 import CartItem from '../components/CartItem';
-import API from '../api/axios';
 
 export default function Cart() {
-  const dispatch    = useDispatch();
-  const navigate    = useNavigate();
-  const isLoggedIn  = useSelector(selectIsLoggedIn);
-  const items       = useSelector(selectCartItems);
-  const total       = useSelector(selectCartTotal);
-  const isLoading   = useSelector(selectCartLoading);
+  const dispatch   = useDispatch();
+  const navigate   = useNavigate();
+  const isLoggedIn = useSelector(selectIsLoggedIn);
+  const items      = useSelector(selectCartItems);
+  const total      = useSelector(selectCartTotal);
+  const isLoading  = useSelector(selectCartLoading);
 
-  const [orderLoading, setOrderLoading] = useState(false);
-  const [orderError,   setOrderError]   = useState('');
-
-  // Redirect to login if not authenticated
   useEffect(() => {
     if (!isLoggedIn) { navigate('/login'); return; }
     dispatch(fetchCart());
   }, [isLoggedIn, dispatch, navigate]);
-
-  const handleCheckout = async () => {
-    if (items.length === 0) return;
-    setOrderLoading(true);
-    setOrderError('');
-    try {
-      // Place the order — backend creates order + order_items rows
-      await API.post('/orders', {
-        items: items.map(i => ({
-          productId: i.product_id,
-          quantity:  i.quantity,
-          price:     i.price,
-        })),
-        totalPrice: total,
-      });
-      // Clear cart after successful order
-      await dispatch(clearCartOnServer());
-      navigate('/orders');
-    } catch (err) {
-      setOrderError(err.response?.data?.error || 'Order failed. Please try again.');
-    } finally {
-      setOrderLoading(false);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -73,7 +41,6 @@ export default function Cart() {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">🛒 Your Cart</h1>
 
       {items.length === 0 ? (
-        /* Empty cart state */
         <div className="text-center py-20">
           <p className="text-5xl mb-4">🛒</p>
           <p className="text-gray-600 font-medium text-lg">Your cart is empty</p>
@@ -89,7 +56,7 @@ export default function Cart() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Cart items list */}
+          {/* Cart items */}
           <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <p className="text-sm text-gray-500 mb-4">
               {items.length} item{items.length !== 1 ? 's' : ''} in your cart
@@ -99,7 +66,7 @@ export default function Cart() {
             ))}
           </div>
 
-          {/* Order summary */}
+          {/* Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sticky top-20">
               <h2 className="font-bold text-gray-900 text-lg mb-4">Order Summary</h2>
@@ -113,31 +80,20 @@ export default function Cart() {
                   <span>Shipping</span>
                   <span className="text-green-600 font-medium">Free</span>
                 </div>
-                <div className="border-t border-gray-100 pt-2 mt-2 flex justify-between font-bold text-gray-900 text-base">
+                <div className="border-t border-gray-100 pt-2 mt-2 flex justify-between
+                                font-bold text-gray-900 text-base">
                   <span>Total</span>
                   <span>₹{total.toLocaleString('en-IN')}</span>
                 </div>
               </div>
 
-              {orderError && (
-                <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-xs">
-                  {orderError}
-                </div>
-              )}
-
+              {/* ← KEY CHANGE: Navigate to checkout instead of placing order directly */}
               <button
-                onClick={handleCheckout}
-                disabled={orderLoading}
-                className="w-full mt-5 py-3 bg-indigo-600 text-white font-semibold rounded-xl text-sm
-                           hover:bg-indigo-700 transition active:scale-95
-                           disabled:opacity-60 disabled:cursor-not-allowed"
+                onClick={() => navigate('/checkout')}
+                className="w-full mt-5 py-3 bg-indigo-600 text-white font-semibold rounded-xl
+                           text-sm hover:bg-indigo-700 transition active:scale-95"
               >
-                {orderLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Placing order...
-                  </span>
-                ) : '✦ Place Order'}
+                Proceed to Checkout →
               </button>
 
               <Link
